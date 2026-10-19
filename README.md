@@ -4,7 +4,20 @@ A self-hosted learning platform in the spirit of SAP SuccessFactors Learning: em
 
 It doesn't depend on any npm packages. Everything runs on plain Node.js.
 
-## Start it
+## Two ways to run it
+
+| | **Server version** (`node server.js`, Render, etc.) | **GitHub Pages demo** (`index.html` at the repository root) |
+|---|---|---|
+| Where data is stored | One shared database on the server | Only in each visitor's own browser |
+| HR sees every employee's results | ✅ | ❌ each device has its own separate copy |
+| Import SCORM packages | ✅ | ❌ (the Chiller package comes pre-installed) |
+| Cost | Hosting needed | Free |
+
+Both use the same screens and the same logic (`lib/routes.js`). The Pages build is `pages/learnhub-local.js`. If you change anything in `lib/`, regenerate it with `node scripts/build-pages.js`.
+
+**Demo sign-ins** (Pages): Admin `admin@company.local` / `Admin123!`; Manager `anita.rao@example.com` / `Welcome123!`; Employee `rahul.verma@example.com` / `Welcome123!`. The sign-in page also has one-click links for each. **Settings → Reset demo data** restores the starting state.
+
+## Start it (server version)
 
 1. Install **Node.js 18 or newer** from https://nodejs.org (one-time).
 2. **Mac:** double-click `start.command`. If macOS blocks it the first time, right-click → Open.

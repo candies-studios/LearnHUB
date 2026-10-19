@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Module 3 – Assessment</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <header>
+      <div class="logo">📝</div>
+      <div>
+        <h1>Chiller SOP &amp; Lockout Process</h1>
+        <p>Module 3 of 3 — Final Assessment</p>
+      </div>
+    </header>
+
+    <div class="container">
+      <div class="mod-badge">📝 <span>Module 3</span> Assessment</div>
+
+      <!-- QUIZ -->
+      <div id="quizArea">
+        <div class="quiz-card">
+          <div class="quiz-top">
+            <h2>Module 3 Assessment</h2>
+            <span class="q-pill" id="qCounter">Question 1 of 15</span>
+          </div>
+
+          <div class="q-text" id="qText"></div>
+
+          <div class="answers" id="answersWrap"></div>
+
+          <div class="feedback" id="feedback"></div>
+
+          <button
+            class="btn"
+            id="nextBtn"
+            style="display: none"
+            onclick="nextQuestion()"
+          >
+            Next Question →
+          </button>
+        </div>
+      </div>
+
+      <!-- RESULTS -->
+      <div id="resultsArea" style="display: none">
+        <div class="results-card">
+          <div class="score-ring">
+            <span class="num" id="scoreNum">0</span>
+            <span class="lbl" id="scoreDenom">/ 15</span>
+          </div>
+          <h2 id="resultTitle"></h2>
+          <div id="resultBadge"></div>
+          <p id="resultMsg"></p>
+          <p style="font-size: 0.8rem; color: #546e7a; margin-top: 12px"></p>
+          <button class="btn" style="margin-top: 20px" onclick="returnToLMS()">
+            Finish
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="js/scorm_api.js"></script>
+    <script>
+      SCORM.init();
+
+      // ── GATE CHECK: block access if prerequisite not completed ──
+      (function () {
+        var prereqDone = localStorage.getItem("im_video2") === "done";
+        if (!prereqDone) {
+          // Prerequisite not met — show locked message then redirect
+          document.body.innerHTML =
+            '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#0f1923;color:#e8eaf0;font-family:Segoe UI,sans-serif;text-align:center;gap:16px">' +
+            '<div style="font-size:3rem">🔒</div>' +
+            '<h2 style="color:#00bcd4">Content Locked</h2>' +
+            '<p style="color:#90a4ae;max-width:340px">Please complete the previous step before accessing this content.</p>' +
+            '<p style="color:#546e7a;font-size:0.85rem">Redirecting you back...</p>' +
+            "</div>";
+          setTimeout(function () {
+            window.location.href = "video2.html";
+          }, 2000);
+          return;
+        }
+      })();
+      // Only set incomplete if not already completed/passed
+      var _cur = SCORM.get("cmi.core.lesson_status");
+      if (_cur !== "completed" && _cur !== "passed" && _cur !== "failed") {
+        SCORM.setStatus("incomplete");
+      }
+
+      // No cross-SCO dependencies — quiz3 reports its own 2 questions only
+      var PASS_PCT = 90;
+
+      var questions = [];
+      var current = 0;
+      var localScore = 0;
+      var answered = false;
+      var quizPassed = false;
+
+      var retakeCount = parseInt(
+        localStorage.getItem("im_quiz_retakes") || "0",
+      );
+      var MAX_RETAKES = 1;
+
+      var QNA = [
+        {
+          question:
+            "What is the primary purpose of a lock-out in an air-cooled chiller?",
+          infoCorrect:
+            "Correct: Lock-out prevents equipment damage and ensures safety during faults.",
+          infoIncorrect:
+            "Lock-out is mainly for safety and protection, not performance improvement.",
+          type: "mcq",
+          answers: [
+            { text: "To increase cooling capacity", correct: false },
+            {
+              text: "To prevent equipment damage and ensure safety",
+              correct: true,
+            },
+            { text: "To reduce noise levels", correct: false },
+            { text: "To improve airflow efficiency", correct: false },
+          ],
+        },
+
+        {
+          question:
+            "Which of the following conditions is most likely to trigger a lock-out?",
+          infoCorrect:
+            "Correct: High discharge pressure is a common fault condition that triggers lock-out.",
+          infoIncorrect:
+            "Lock-outs are triggered by abnormal conditions like high pressure, not normal operation.",
+          type: "mcq",
+          answers: [
+            { text: "High discharge pressure", correct: true },
+            { text: "Low ambient temperature", correct: false },
+            { text: "Normal operating load", correct: false },
+            { text: "Balanced refrigerant levels", correct: false },
+          ],
+        },
+
+        {
+          question:
+            "What is the first step a technician should take after a chiller enters lock-out mode?",
+          infoCorrect:
+            "Correct: Always check diagnostic codes and alarms before taking action.",
+          infoIncorrect:
+            "Never reset immediately—diagnostics must be checked first.",
+          type: "mcq",
+          answers: [
+            { text: "Immediately reset the system", correct: false },
+            { text: "Check diagnostic codes and alarms", correct: true },
+            { text: "Increase the refrigerant charge", correct: false },
+            { text: "Shut down the building's power supply", correct: false },
+          ],
+        },
+
+        {
+          question:
+            "A lock-out requires manual or system reset, while a shutdown may restart automatically.",
+          infoCorrect:
+            "Correct: Lock-out requires manual/system reset, while shutdown may restart automatically.",
+          infoIncorrect:
+            "Lock-out is more restrictive than shutdown and requires intervention.",
+          type: "tf",
+          answers: [
+            { text: "True", correct: true },
+            { text: "False", correct: false },
+          ],
+        },
+
+        {
+          question:
+            "Which safety measure is essential before troubleshooting a locked-out chiller?",
+          infoCorrect:
+            "Correct: PPE like gloves and goggles are essential for safety.",
+          infoIncorrect: "Safety comes first—always use proper PPE.",
+          type: "mcq",
+          answers: [
+            { text: "Wearing PPE such as gloves and goggles", correct: true },
+            { text: "Increasing the setpoint temperature", correct: false },
+            {
+              text: "Disconnecting the building's water supply",
+              correct: false,
+            },
+            { text: "Running the chiller at partial load", correct: false },
+          ],
+        },
+
+        {
+          question: "Why is documentation of lock-out incidents important?",
+          infoCorrect:
+            "Correct: It ensures compliance and helps track recurring issues.",
+          infoIncorrect:
+            "Documentation is for safety tracking and compliance, not performance metrics.",
+          type: "mcq",
+          answers: [
+            { text: "To calculate energy efficiency", correct: false },
+            { text: "To reduce refrigerant usage", correct: false },
+            { text: "To improve airflow distribution", correct: false },
+            {
+              text: "To comply with safety regulations and track recurring issues",
+              correct: true,
+            },
+          ],
+        },
+
+        {
+          question:
+            "Disabling the lock-out function is an acceptable long-term fix when a chiller repeatedly trips during peak load.",
+          infoCorrect: "Correct: Disabling safety systems is never acceptable.",
+          infoIncorrect:
+            "Never bypass safety systems—fix the root cause instead.",
+          type: "tf",
+          answers: [
+            { text: "True", correct: false },
+            { text: "False", correct: true },
+          ],
+        },
+
+        {
+          question:
+            "What is the primary function of an air-cooled chiller in HVAC systems?",
+          infoCorrect:
+            "Correct: It removes heat from water and rejects it to the air.",
+          infoIncorrect:
+            "Chillers remove heat—they do not heat water or increase humidity.",
+          type: "mcq",
+          answers: [
+            { text: "To heat water for building use", correct: false },
+            {
+              text: "To remove heat from water and reject it to the air",
+              correct: true,
+            },
+            { text: "To increase indoor humidity", correct: false },
+            { text: "To store refrigerant for backup", correct: false },
+          ],
+        },
+
+        {
+          question:
+            "Which component in an air-cooled chiller is responsible for rejecting heat to the atmosphere?",
+          infoCorrect:
+            "Correct: The condenser coil with fans releases heat into the air.",
+          infoIncorrect:
+            "Heat rejection happens in the condenser, not evaporator or compressor.",
+          type: "mcq",
+          answers: [
+            { text: "Evaporator", correct: false },
+            { text: "Compressor", correct: false },
+            { text: "Condenser coil with fans", correct: true },
+            { text: "Expansion valve", correct: false },
+          ],
+        },
+
+        {
+          question:
+            "Air-cooled chillers cool water or glycol solution circulated through a cooling loop.",
+          infoCorrect: "Correct: Water or glycol is circulated and cooled.",
+          infoIncorrect: "Chillers cool liquids, not air directly.",
+          type: "tf",
+          answers: [
+            { text: "True", correct: true },
+            { text: "False", correct: false },
+          ],
+        },
+
+        {
+          question:
+            "Why are air-cooled chillers often preferred over water-cooled chillers in certain installations?",
+          infoCorrect:
+            "Correct: They need less maintenance and no cooling tower.",
+          infoIncorrect:
+            "Air-cooled chillers are simpler and easier to maintain.",
+          type: "mcq",
+          answers: [
+            {
+              text: "They require less maintenance and no cooling tower",
+              correct: true,
+            },
+            {
+              text: "They provide higher efficiency in all climates",
+              correct: false,
+            },
+            { text: "They use less refrigerant", correct: false },
+            { text: "They operate silently", correct: false },
+          ],
+        },
+
+        {
+          question:
+            "Which operational parameter must be closely monitored to prevent chiller inefficiency or lock-out?",
+          infoCorrect:
+            "Correct: Airflow and condenser temperature directly impact performance.",
+          infoIncorrect:
+            "Focus on thermal and airflow conditions, not unrelated factors.",
+          type: "mcq",
+          answers: [
+            { text: "Ambient noise levels", correct: false },
+            { text: "Building occupancy", correct: false },
+            { text: "Lighting load", correct: false },
+            { text: "Condenser air temperature and airflow", correct: true },
+          ],
+        },
+
+        {
+          question:
+            "The expansion valve in a chiller is responsible for compressing refrigerant vapor.",
+          infoCorrect:
+            "Correct: The expansion valve controls refrigerant flow into the evaporator.",
+          infoIncorrect:
+            "The expansion valve controls flow—not compression or heat rejection.",
+          type: "tf",
+          answers: [
+            { text: "True", correct: false },
+            { text: "False", correct: true },
+          ],
+        },
+
+        {
+          question:
+            "During peak load operation, what preventive measure ensures stable chiller performance?",
+          infoCorrect:
+            "Correct: Clean condenser coils ensure efficient heat transfer.",
+          infoIncorrect:
+            "Maintenance is key—never bypass safety or overload system.",
+          type: "mcq",
+          answers: [
+            { text: "Reducing fan speed", correct: false },
+            { text: "Cleaning condenser coils regularly", correct: true },
+            {
+              text: "Increasing refrigerant charge beyond design",
+              correct: false,
+            },
+            { text: "Disabling safety controls", correct: false },
+          ],
+        },
+
+        {
+          question:
+            "What is the typical consequence of dirty condenser coils in an air-cooled chiller?",
+          infoCorrect:
+            "Correct: Dirty coils increase pressure and reduce efficiency.",
+          infoIncorrect:
+            "Dirty coils mainly affect heat rejection, not water flow directly.",
+          type: "mcq",
+          answers: [
+            { text: "Reduced water flow", correct: false },
+            { text: "Lower refrigerant charge", correct: false },
+            {
+              text: "Increased discharge pressure and reduced efficiency",
+              correct: true,
+            },
+            { text: "Faster compressor cycling", correct: false },
+          ],
+        },
+      ];
+
+      function shuffle(arr) {
+        for (var i = arr.length - 1; i > 0; i--) {
+          var j = Math.floor(Math.random() * (i + 1));
+          var t = arr[i];
+          arr[i] = arr[j];
+          arr[j] = t;
+        }
+        return arr;
+      }
+
+      questions = shuffle(QNA.slice());
+
+      function startQuiz() {
+        current = 0;
+        localScore = 0;
+        renderQuestion();
+      }
+
+      function renderQuestion() {
+        answered = false;
+
+        var q = questions[current];
+
+        document.getElementById("qCounter").textContent =
+          "Question " + (current + 1) + " of " + questions.length;
+
+        document.getElementById("qText").innerHTML =
+          '<span class="type-pill">' +
+          (q.type === "tf" ? "True / False" : "Multiple Choice") +
+          "</span> " +
+          q.question;
+
+        var wrap = document.getElementById("answersWrap");
+        wrap.innerHTML = "";
+
+        shuffle(q.answers.slice()).forEach(function (ans) {
+          var btn = document.createElement("button");
+
+          btn.className = "ans-btn";
+          btn.textContent = ans.text;
+          btn.dataset.correct = ans.correct;
+
+          btn.onclick = function () {
+            selectAnswer(btn, q);
+          };
+
+          wrap.appendChild(btn);
+        });
+
+        document.getElementById("feedback").className = "feedback";
+        document.getElementById("feedback").textContent = "";
+
+        document.getElementById("nextBtn").style.display = "none";
+      }
+
+      function selectAnswer(btn, q) {
+        if (answered) return;
+
+        answered = true;
+
+        var correct = btn.dataset.correct === "true";
+
+        document
+          .querySelectorAll("#answersWrap .ans-btn")
+          .forEach(function (b) {
+            b.disabled = true;
+
+            if (b.dataset.correct === "true") {
+              b.classList.add("correct");
+            }
+          });
+
+        if (correct) {
+          localScore++;
+          btn.classList.add("correct");
+        } else {
+          btn.classList.add("incorrect");
+        }
+
+        var fb = document.getElementById("feedback");
+
+        fb.className = "feedback show " + (correct ? "ok" : "ko");
+        fb.textContent = correct ? q.infoCorrect : q.infoIncorrect;
+
+        document.getElementById("nextBtn").style.display = "inline-flex";
+
+        if (current === questions.length - 1) {
+          document.getElementById("nextBtn").textContent =
+            "Submit & Finish Course →";
+        }
+      }
+
+      function nextQuestion() {
+        current++;
+
+        if (current < questions.length) {
+          renderQuestion();
+        } else {
+          showResults();
+        }
+      }
+
+      // ── SUBMIT — reports only this module's 2 questions ──
+      function showResults() {
+        var total = questions.length;
+        var pct = Math.round((localScore / total) * 100);
+
+        var passed = pct >= PASS_PCT;
+        quizPassed = passed;
+
+        SCORM.set("cmi.core.score.raw", String(localScore));
+        SCORM.set("cmi.core.score.min", "0");
+        SCORM.set("cmi.core.score.max", String(total));
+        SCORM.set("cmi.core.lesson_status", passed ? "passed" : "failed");
+        SCORM.commit();
+
+        document.getElementById("quizArea").style.display = "none";
+        document.getElementById("resultsArea").style.display = "block";
+
+        document.getElementById("scoreNum").textContent = localScore;
+        document.getElementById("scoreDenom").textContent = "/ " + total;
+
+        document.getElementById("resultTitle").textContent = passed
+          ? "Course Complete! 🎉"
+          : "Assessment Failed";
+
+        var badge = document.getElementById("resultBadge");
+
+        badge.className = passed ? "pass-badge" : "fail-badge";
+
+        badge.textContent = passed ? "✅ PASSED" : "❌ FAILED";
+
+        document.getElementById("resultMsg").textContent =
+          "You scored " +
+          localScore +
+          " / " +
+          total +
+          " (" +
+          pct +
+          "%). " +
+          (passed
+            ? "You have successfully completed the course."
+            : "A minimum score of 90% is required to complete the course.");
+      }
+      function returnToLMS() {
+        if (quizPassed) {
+          localStorage.setItem("im_quiz", "done");
+        } else {
+          localStorage.removeItem("im_quiz");
+        }
+
+        SCORM.finish();
+        window.close();
+      }
+
+      startQuiz();
+    </script>
+  </body>
+</html>

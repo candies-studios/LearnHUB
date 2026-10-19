@@ -53,7 +53,7 @@ async function openLearning(userId, after) {
     body: `<div class="row between" style="margin-bottom:14px"><div class="muted small">${esc(d.user.empId || '')} · ${esc(d.user.title || '')} · ${esc(d.user.department || '')} · ${esc(d.user.email)}</div><button class="btn sm primary" id="asg">${I('plus')}Assign course</button></div>
       <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Course</th><th>Status</th><th>Progress</th><th>Score</th><th>Due</th><th>Certificate</th><th></th></tr></thead><tbody>
       ${d.enrollments.map((e) => `<tr><td class="name"><b>${esc(e.course.title)}</b><span>${e.required ? 'Required' : 'Optional'}${e.manualCompletion ? ' · recorded manually' : ''}</span></td><td>${pill(e.status, e.overdue)}</td><td style="min-width:110px">${progress(e.progressPct)}</td><td>${e.score != null ? e.score + '%' : '—'}</td><td class="nowrap">${fmtDate(e.dueDate)}</td>
-        <td>${e.certificate ? `<a target="_blank" href="/cert/${esc(e.certificate.code)}">${esc(e.certificate.code)}</a><br>${pill(e.certificate.status)}` : '—'}</td>
+        <td>${e.certificate ? `<a target="_blank" href="${esc(certLink(e.certificate.code))}">${esc(e.certificate.code)}</a><br>${pill(e.certificate.status)}` : '—'}</td>
         <td class="actions"><select data-act="${e.id}" style="width:auto;padding:4px 8px;font-size:12.5px"><option value="">Actions…</option><option value="due">Change due date</option>${e.status === 'failed' || e.status === 'in_progress' ? '<option value="attempt">Grant extra exam attempt</option>' : ''}${isAdmin() && e.status !== 'completed' ? '<option value="complete">Record as completed</option>' : ''}${isAdmin() ? '<option value="remove">Remove enrollment</option>' : ''}</select></td></tr>`).join('') || '<tr><td colspan="7" class="empty">No enrollments</td></tr>'}
       </tbody></table></div>
       <h3 style="margin:20px 0 8px">Exam attempts</h3>
@@ -242,7 +242,7 @@ on('/admin/courses', async (el) => {
   });
   $('#imp').onclick = () => modal({
     title: 'Import SCORM package', okText: 'Upload & import',
-    body: `<p>Upload a SCORM 1.2 or 2004 package as a <b>.zip</b> file (the zip must contain <code class="k">imsmanifest.xml</code>). Completion status, scores and bookmarks are tracked automatically.</p><div class="field"><input type="file" id="zf" accept=".zip,application/zip"></div><div id="upst" class="small muted"></div>`,
+    body: (LOCAL ? `<div class="note warn" style="margin-bottom:12px">SCORM import needs the server version of LearnHub. This demo already includes the Chiller SOP &amp; Lockout package.</div>` : '') + `<p>Upload a SCORM 1.2 or 2004 package as a <b>.zip</b> file (the zip must contain <code class="k">imsmanifest.xml</code>). Completion status, scores and bookmarks are tracked automatically.</p><div class="field"><input type="file" id="zf" accept=".zip,application/zip"></div><div id="upst" class="small muted"></div>`,
     ok: async (r) => {
       const f = $('#zf', r).files[0];
       if (!f) throw new Error('Choose a .zip file');
@@ -555,7 +555,7 @@ on('/admin/certificates', async (el) => {
     const list = rows.filter((c) => (!fs || c.status === fs) && (!q || (c.code + ' ' + c.userName + ' ' + c.courseTitle).toLowerCase().includes(q)));
     $('#sub').textContent = `${rows.filter((c) => c.status === 'valid' || c.status === 'expiring').length} valid · ${rows.filter((c) => c.status === 'expiring').length} expiring soon · ${rows.filter((c) => c.status === 'expired').length} expired`;
     $('#tb').innerHTML = list.map((c) => `<tr><td><code class="k">${esc(c.code)}</code></td><td class="name"><b>${esc(c.userName)}</b><span>${esc(c.user ? c.user.department || '' : '')}</span></td><td>${esc(c.courseTitle)}</td><td>${c.score != null ? c.score + '%' : '—'}</td><td class="nowrap">${fmtDate(c.issuedAt)}</td><td class="nowrap">${c.expiresAt ? fmtDate(c.expiresAt) : 'Never'}</td><td>${pill(c.status)}</td>
-      <td class="actions"><a class="btn sm" target="_blank" href="/cert/${esc(c.code)}">View</a> ${c.status !== 'revoked' ? `<button class="btn sm ghost danger" data-rv="${c.id}">Revoke</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">No certificates</td></tr>';
+      <td class="actions"><a class="btn sm" target="_blank" href="${esc(certLink(c.code))}">View</a> ${c.status !== 'revoked' ? `<button class="btn sm ghost danger" data-rv="${c.id}">Revoke</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">No certificates</td></tr>';
     $$('[data-rv]').forEach((b) => (b.onclick = () => modal({ title: 'Revoke certificate', okText: 'Revoke', danger: true, body: `<p>The certificate page will show it as revoked. This can't be undone.</p><div class="field"><label class="f">Reason</label><input type="text" id="rr" placeholder="e.g. Issued in error"></div>`,
       ok: async (r) => { await POST(`/api/admin/certificates/${b.dataset.rv}/revoke`, { reason: val(r, '#rr') }); rows = await GET('/api/admin/certificates'); draw(); toast('Revoked'); } })));
   };
@@ -578,7 +578,10 @@ on('/admin/settings', async (el) => {
     <div class="card"><div class="card-h"><h3>Data &amp; backups</h3></div><div class="card-b prose" style="font-size:13.5px">
       <p>All data is stored in the <code class="k">data</code> folder next to the app: <code class="k">db.json</code> holds people, courses, results and certificates; <code class="k">content/</code> holds uploaded videos, documents and SCORM packages.</p>
       <p>A dated copy of the database is saved to <code class="k">data/backups</code> each day the server starts (last 14 kept). To back up everything, copy the whole <code class="k">data</code> folder.</p>
+      ${LOCAL ? `<div class="note warn" style="display:block;margin-bottom:12px"><b>Demo mode (GitHub Pages).</b> This copy runs entirely in your browser: data is stored on this device only and is not shared with other people or devices. For a real shared system, run the server version (see DEPLOY.md).<div style="margin-top:10px"><button type="button" class="btn sm danger" id="rst">Reset demo data</button></div></div>` : ''}
       <p>Exports: <a href="/api/export/employees.csv">employees</a> · <a href="/api/export/enrollments.csv">enrollments</a> · <a href="/api/export/attempts.csv">exam results</a></p></div></div></div></div>`;
+  const rst = $('#rst');
+  if (rst) rst.onclick = async () => { if (await confirmBox('Erase everything in this browser and restore the original demo data?', 'Reset', true)) { window.LearnHubLocal.reset(); location.hash = '#/'; location.reload(); } };
   $('#sf').onsubmit = async (e) => {
     e.preventDefault();
     try { S.settings = await PUT('/api/admin/settings', { orgName: val(el, '#on'), brandColor: val(el, '#bc'), certSigner: val(el, '#cs'), certSignerTitle: val(el, '#ct'), passwordMin: val(el, '#pm') }); toast('Saved', 'ok'); render(); } catch (x) { fail(x); }

@@ -7,7 +7,22 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const S = { me: null, settings: {}, teamSize: 0, cleanup: [] };
 
+// GitHub Pages build: the API runs inside the browser (pages/learnhub-local.js) instead of on a server.
+const LOCAL = !!(window.LH_LOCAL && window.LearnHubLocal);
+const CONTENT = LOCAL ? 'content/' : '/content/';
+const resolveUrl = (u) => (LOCAL ? window.LearnHubLocal.resolveUrl(u) : Promise.resolve(u));
+const certLink = (code) => (LOCAL ? location.pathname + location.search + '#/cert/' + encodeURIComponent(code) : '/cert/' + encodeURIComponent(code));
+
 async function api(method, url, body) {
+  if (LOCAL) {
+    const r = await window.LearnHubLocal.handle(method, url, body);
+    if (r.status >= 400) {
+      if (r.status === 401 && !url.includes('/api/login')) { S.me = null; render(); }
+      throw new Error((r.data && r.data.error) || 'Error ' + r.status);
+    }
+    if (r.csv) { downloadText(r.csv.name, r.csv.text); return null; }
+    return r.data;
+  }
   const opt = { method, headers: {} };
   if (body instanceof FormData) opt.body = body;
   else if (body !== undefined) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
@@ -166,6 +181,9 @@ async function render() {
   document.documentElement.style.setProperty('--brand', S.settings.brandColor || '#0a6ed1');
   document.title = (S.settings.orgName ? S.settings.orgName + ' · ' : '') + 'LearnHub';
   const app = $('#app');
+  const certMatch = LOCAL && /^#\/cert\/([^/?]+)/.exec(location.hash);
+  if (certMatch && document.readyState !== 'complete') { window.addEventListener('load', render, { once: true }); return; }
+  if (certMatch) { document.open(); document.write(window.LearnHubLocal.certificatePage(decodeURIComponent(certMatch[1]))); document.close(); return; }
   if (!S.me) return renderLogin(app);
   if (S.me.mustChangePassword) return renderForceChange(app);
   const hash = (location.hash.slice(1) || '/').split('?')[0];
@@ -187,6 +205,15 @@ async function render() {
   location.hash = '#/';
 }
 window.addEventListener('hashchange', render);
+if (LOCAL) {
+  // CSV export links point at the server API; in the browser build generate the file locally instead
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest && e.target.closest('a[href*="/api/export/"]');
+    if (!a) return;
+    e.preventDefault();
+    GET(a.getAttribute('href')).catch(fail);
+  });
+}
 
 function shell(app, active) {
   const me = S.me;
@@ -249,9 +276,11 @@ function renderLogin(app) {
         <div id="lerr" class="note bad hidden" style="margin-bottom:14px"></div>
         <button class="btn primary lg" style="width:100%">Sign in</button>
         <p class="muted small" style="margin-top:18px">Forgot your password? Ask HR or your LMS administrator to reset it.</p>
+        ${LOCAL ? `<div class="note" style="margin-top:18px;display:block"><b>Demo mode</b> — everything you do is saved only in this browser on this device.<br><span class="small">Try: <a href="#" data-demo="admin@company.local|Admin123!">Admin</a> · <a href="#" data-demo="anita.rao@example.com|Welcome123!">Manager</a> · <a href="#" data-demo="rahul.verma@example.com|Welcome123!">Employee</a></span></div>` : ''}
       </form>
     </div></div>`;
   $('#em').focus();
+  $$('[data-demo]').forEach((a) => (a.onclick = (e) => { e.preventDefault(); const [em, pw] = a.dataset.demo.split('|'); $('#em').value = em; $('#pw').value = pw; $('#lf').requestSubmit(); }));
   $('#lf').onsubmit = async (e) => {
     e.preventDefault();
     const btn = $('#lf button'); btn.disabled = true;
@@ -300,7 +329,7 @@ function learnRow(e) {
     <div class="pc">${progress(e.progressPct)}</div>
     <div class="due small">${e.status === 'completed' ? `<span class="muted">Completed</span><br>${fmtDate(e.completedAt)}` : e.dueDate ? `<span class="muted">Due</span><br><b style="color:${e.overdue ? 'var(--bad)' : 'inherit'}">${fmtDate(e.dueDate)}</b>` : '<span class="muted">No due date</span>'}</div>
     <div class="row" style="justify-content:flex-end">${pill(e.status, e.overdue)}
-      ${e.certificate && e.certificate.status !== 'revoked' ? `<a class="btn sm" target="_blank" href="/cert/${esc(e.certificate.code)}">${I('cert')}Certificate</a>` : ''}
+      ${e.certificate && e.certificate.status !== 'revoked' ? `<a class="btn sm" target="_blank" href="${esc(certLink(e.certificate.code))}">${I('cert')}Certificate</a>` : ''}
       <a class="btn sm ${e.status === 'completed' ? '' : 'primary'}" href="#/learn/${e.id}">${btn}</a></div>
   </div>`;
 }
@@ -387,7 +416,7 @@ async function pageLearn(el, id, mid) {
           <span class="dot ${m.done ? 'done' : failed ? 'fail' : ''}">${m.done ? '✓' : failed ? '!' : i + 1}</span>
           <span class="mt"><b>${esc(m.title)}</b><span>${{ video: 'Video', text: 'Reading', document: 'Document', link: 'External link', exam: 'Assessment' }[m.type]}${lockedIdx(i) ? ' · 🔒 Locked' : ''}</span></span></button></li>`;
       }).join('')}</ul>
-      ${e.status === 'completed' ? `<div style="padding:10px 20px"><div class="note ok">${I('check', 18)}<div><b>Course complete</b><br>${fmtDate(e.completedAt)}${e.certificate ? `<br><a target="_blank" href="/cert/${esc(e.certificate.code)}">View certificate →</a>` : ''}</div></div></div>` : ''}
+      ${e.status === 'completed' ? `<div style="padding:10px 20px"><div class="note ok">${I('check', 18)}<div><b>Course complete</b><br>${fmtDate(e.completedAt)}${e.certificate ? `<br><a target="_blank" href="${esc(certLink(e.certificate.code))}">View certificate →</a>` : ''}</div></div></div>` : ''}
     </aside>
     <section class="stage"><div class="content" id="stage"></div></section></div>`;
   $$('.mods button').forEach((b) => (b.onclick = () => { location.hash = `#/learn/${id}/${b.dataset.m}`; }));
@@ -406,9 +435,10 @@ async function pageLearn(el, id, mid) {
     ? `<div class="row" style="margin-top:18px"><span class="pill ok">✓ Completed</span>${next ? `<button class="btn primary" id="nx">Next: ${esc(next.title)} →</button>` : ''}</div>`
     : `<div class="row" style="margin-top:18px"><button class="btn primary" id="mc">${label}</button></div>`;
   const st = $('#stage');
+  const src = cur.type === 'video' || cur.type === 'document' ? await resolveUrl(cur.url) : cur.url;
 
   if (cur.type === 'video') {
-    st.innerHTML = header + `<div class="video-box"><video id="vid" src="${esc(cur.url)}" preload="metadata" playsinline ${cur.preventSkip ? 'controlsList="nodownload"' : 'controls controlsList="nodownload"'}></video>
+    st.innerHTML = header + `<div class="video-box"><video id="vid" src="${esc(src)}" preload="metadata" playsinline ${cur.preventSkip ? 'controlsList="nodownload"' : 'controls controlsList="nodownload"'}></video>
       ${cur.preventSkip ? `<div class="vctl"><button id="pp">▶ Play</button><div class="track" id="trk"><i id="wch"></i><b id="thm" style="left:0"></b></div><span class="tm" id="tm">0:00 / 0:00</span><button id="mu">🔊</button></div>` : ''}</div>
       <div class="note ${cur.done ? 'ok' : ''}" id="vh" style="margin-top:14px">${cur.done ? '✓ You have watched this video.' : cur.preventSkip ? '⏳ Watch the whole video to complete this module. Skipping ahead is disabled.' : '⏳ Watch the video to complete this module.'}</div>` + (cur.done && next ? `<div class="row" style="margin-top:14px"><button class="btn primary" id="nx">Next: ${esc(next.title)} →</button></div>` : '');
     const v = $('#vid');
@@ -453,9 +483,9 @@ async function pageLearn(el, id, mid) {
   } else if (cur.type === 'text') {
     st.innerHTML = header + `<div class="card card-b prose">${md(cur.body)}</div>` + doneBar('Mark as complete');
   } else if (cur.type === 'document') {
-    const isPdf = /\.pdf($|\?)/i.test(cur.url);
-    st.innerHTML = header + (isPdf ? `<iframe class="doc-frame" src="${esc(cur.url)}"></iframe>` : `<div class="card card-b"><p>Download and read this document:</p><a class="btn" href="${esc(cur.url)}" target="_blank">${I('download')}${esc(cur.fileName || 'Open document')}</a></div>`)
-      + `<p class="small muted" style="margin-top:8px"><a href="${esc(cur.url)}" target="_blank">Open in a new tab</a></p>` + doneBar("I've read this document");
+    const isPdf = /\.pdf($|\?)/i.test(cur.fileName || cur.url);
+    st.innerHTML = header + (isPdf ? `<iframe class="doc-frame" src="${esc(src)}"></iframe>` : `<div class="card card-b"><p>Download and read this document:</p><a class="btn" href="${esc(src)}" download="${esc(cur.fileName || '')}" target="_blank">${I('download')}${esc(cur.fileName || 'Open document')}</a></div>`)
+      + `<p class="small muted" style="margin-top:8px"><a href="${esc(src)}" target="_blank">Open in a new tab</a></p>` + doneBar("I've read this document");
   } else if (cur.type === 'link') {
     st.innerHTML = header + `<div class="card card-b"><p>This module is hosted on another site.</p><a class="btn" href="${esc(cur.url)}" target="_blank" rel="noopener">${I('link')}Open ${esc(cur.url)}</a></div>` + doneBar("I've completed this");
   } else if (cur.type === 'exam') {
@@ -492,7 +522,7 @@ async function pageLearn(el, id, mid) {
 // ------------------------------------------------------------ SCORM 1.2 / 2004 runtime
 function scormPlayer(el, d) {
   const c = d.course, enrId = d.enrollment.id;
-  const base = '/content/scorm/' + c.scorm.dir.replace(/\/$/, '') + '/';
+  const base = CONTENT + 'scorm/' + c.scorm.dir.replace(/\/$/, '') + '/';
   const items = c.scorm.items;
   let data = d.scormData || {};
   let enr = d.enrollment;
@@ -520,7 +550,7 @@ function scormPlayer(el, d) {
       return `<li><button data-h="${esc(it.href)}" class="${current === keyOf(it.href) ? 'on' : ''}"><span class="dot ${ok ? 'done' : bad ? 'fail' : ''}">${ok ? '✓' : bad ? '!' : i + 1}</span><span class="mt"><b>${esc(it.title)}</b><span>${esc(st.replace(/^./, (m) => m.toUpperCase()))}</span></span></button></li>`;
     }).join('');
     $$('#items button').forEach((b) => (b.onclick = () => { frame.src = base + b.dataset.h; }));
-    $('#done').innerHTML = enr.status === 'completed' ? `<div class="note ok">${I('check', 18)}<div><b>Course complete</b>${enr.certificate ? `<br><a target="_blank" href="/cert/${esc(enr.certificate.code)}">View certificate →</a>` : ''}</div></div>`
+    $('#done').innerHTML = enr.status === 'completed' ? `<div class="note ok">${I('check', 18)}<div><b>Course complete</b>${enr.certificate ? `<br><a target="_blank" href="${esc(certLink(enr.certificate.code))}">View certificate →</a>` : ''}</div></div>`
       : enr.status === 'failed' ? `<div class="note bad"><div><b>Assessment not passed.</b> Re-open the assessment to try again.</div></div>` : '';
   };
   const scoFromFrame = () => {
@@ -549,8 +579,9 @@ function scormPlayer(el, d) {
     if (!Object.keys(dirty).length && !final) return;
     const payload = JSON.stringify({ sco: current, cmi: dirty });
     dirty = {};
-    return fetch(`/api/scorm/${enrId}/commit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true })
-      .then((r) => r.json()).then((j) => {
+    const req = LOCAL ? api('POST', `/api/scorm/${enrId}/commit`, JSON.parse(payload))
+      : fetch(`/api/scorm/${enrId}/commit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true }).then((r) => r.json());
+    return req.then((j) => {
         if (!j.enrollment) return;
         const was = enr.status;
         data = j.scormData; enr = j.enrollment; drawOutline();
@@ -686,7 +717,7 @@ on('/result/:id', async (el, p) => {
       </div>
       ${r.autoSubmitted ? '<p class="small muted">Submitted automatically when time ran out.</p>' : ''}
       <div class="row" style="justify-content:center;margin-top:16px">
-        ${r.certificateCode ? `<a class="btn primary lg" target="_blank" href="/cert/${esc(r.certificateCode)}">${I('cert')}View your certificate</a>` : ''}
+        ${r.certificateCode ? `<a class="btn primary lg" target="_blank" href="${esc(certLink(r.certificateCode))}">${I('cert')}View your certificate</a>` : ''}
         ${!r.passed && own ? `<a class="btn primary" href="#/learn/${r.enrollmentId}">Review the material and retry</a>` : ''}
       </div>
     </div>
@@ -709,7 +740,7 @@ on('/certificates', async (el) => {
       <div class="row between"><span class="code">${esc(c.code)}</span>${pill(c.status)}</div>
       <h3 style="margin:10px 0 6px">${esc(c.courseTitle)}</h3>
       <div class="small muted">Issued ${fmtDate(c.issuedAt)}${c.expiresAt ? ' · Valid until ' + fmtDate(c.expiresAt) : ' · No expiry'}${c.score != null ? ' · Score ' + c.score + '%' : ''}</div>
-      <div class="row" style="margin-top:14px"><a class="btn sm primary" target="_blank" href="/cert/${esc(c.code)}">${I('eye')}View / print</a></div></div>`).join('')}</div>`
+      <div class="row" style="margin-top:14px"><a class="btn sm primary" target="_blank" href="${esc(certLink(c.code))}">${I('eye')}View / print</a></div></div>`).join('')}</div>`
     : `<div class="card empty"><b>No certificates yet</b>Complete a course to earn your first certificate.</div>`}</div>`;
 }, { nav: '/certificates' });
 
@@ -717,7 +748,7 @@ on('/transcript', async (el) => {
   const t = await GET('/api/my/transcript');
   el.innerHTML = `<div class="page"><div class="page-head"><div><h1>Learning transcript</h1><p>${esc(S.me.name)}${S.me.empId ? ' · ' + esc(S.me.empId) : ''}${S.me.department ? ' · ' + esc(S.me.department) : ''}</p></div><button class="btn no-print" onclick="print()">${I('print')}Print transcript</button></div>
     <div class="card"><div class="card-h"><h3>Courses</h3></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Course</th><th>Status</th><th>Progress</th><th>Score</th><th>Enrolled</th><th>Completed</th><th>Certificate</th></tr></thead><tbody>
-    ${t.enrollments.map((e) => `<tr><td class="name"><b><a href="#/learn/${e.id}">${esc(e.course.title)}</a></b><span>${esc(e.course.code || '')}</span></td><td>${pill(e.status, e.overdue)}</td><td style="min-width:120px">${progress(e.progressPct)}</td><td>${e.score != null ? e.score + '%' : '—'}</td><td>${fmtDate(e.enrolledAt)}</td><td>${fmtDate(e.completedAt)}</td><td>${e.certificate ? `<a target="_blank" href="/cert/${esc(e.certificate.code)}">${esc(e.certificate.code)}</a>` : '—'}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">No courses yet</td></tr>'}
+    ${t.enrollments.map((e) => `<tr><td class="name"><b><a href="#/learn/${e.id}">${esc(e.course.title)}</a></b><span>${esc(e.course.code || '')}</span></td><td>${pill(e.status, e.overdue)}</td><td style="min-width:120px">${progress(e.progressPct)}</td><td>${e.score != null ? e.score + '%' : '—'}</td><td>${fmtDate(e.enrolledAt)}</td><td>${fmtDate(e.completedAt)}</td><td>${e.certificate ? `<a target="_blank" href="${esc(certLink(e.certificate.code))}">${esc(e.certificate.code)}</a>` : '—'}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">No courses yet</td></tr>'}
     </tbody></table></div></div>
     <div class="card" style="margin-top:16px"><div class="card-h"><h3>Assessment history</h3></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Assessment</th><th>Course</th><th>Attempt</th><th>Date</th><th>Score</th><th>Result</th><th></th></tr></thead><tbody>
     ${t.attempts.map((a) => `<tr><td><b>${esc(a.title)}</b></td><td>${esc(a.courseTitle)}</td><td>#${a.attemptNo}</td><td>${fmtDT(a.submittedAt)}</td><td><b>${a.pct}%</b> <span class="muted small">(${a.score}/${a.maxScore})</span></td><td>${a.passed ? '<span class="pill ok">Pass</span>' : '<span class="pill bad">Fail</span>'}</td><td class="actions"><a class="btn sm" href="#/result/${a.id}">Review</a></td></tr>`).join('') || '<tr><td colspan="7" class="empty">No assessments taken yet</td></tr>'}

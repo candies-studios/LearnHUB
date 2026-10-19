@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Module 2 – Video</title>
+  <link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+<header>
+  <div class="logo">🎓</div>
+  <div>
+    <h1>Lockout Process</h1>
+    <p>Module 2 of 3 — Video Lesson</p>
+  </div>
+</header>
+
+</div>
+
+<div class="container">
+  <div class="mod-badge">📹 <span>Module 2</span> Lockout Process</div>
+
+  <!-- Custom no-skip video player -->
+  <div class="video-wrap">
+    <video id="vid" controlsList="nodownload" style="width:100%;display:block;max-height:460px">
+      <source src="video/m1_c1.mp4" type="video/mp4"/>
+    </video>
+    <div class="custom-controls">
+      <button class="play-btn" id="playBtn" onclick="togglePlay()">▶ Play</button>
+      <div class="prog-track" id="progTrack">
+        <div class="prog-watched" id="progWatched"></div>
+        <div class="prog-thumb"   id="progThumb"></div>
+      </div>
+      <span class="time-label" id="timeLabel">0:00 / 0:00</span>
+      <button class="vol-btn" onclick="toggleMute()" id="volBtn">🔊</button>
+    </div>
+    <div class="skip-warning" id="skipWarning">⚠️ You cannot skip ahead in this video.</div>
+  </div>
+
+  <div class="info-card">
+    <p id="hint">⏳ Watch the full video to unlock the assessment.</p>
+  </div>
+
+  <button class="btn" id="nextBtn" disabled onclick="goNext()">
+    Proceed to Assessment →
+  </button>
+</div>
+
+<script src="js/scorm_api.js"></script>
+<script>
+  SCORM.init();
+
+  // ── GATE CHECK: block access if prerequisite not completed ──
+  (function() {
+    var prereqDone = localStorage.getItem("im_video1") === "done";
+    if (!prereqDone) {
+      // Prerequisite not met — show locked message then redirect
+      document.body.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#0f1923;color:#e8eaf0;font-family:Segoe UI,sans-serif;text-align:center;gap:16px">' +
+        '<div style="font-size:3rem">🔒</div>' +
+        '<h2 style="color:#00bcd4">Content Locked</h2>' +
+        '<p style="color:#90a4ae;max-width:340px">Please complete the previous step before accessing this content.</p>' +
+        '<p style="color:#546e7a;font-size:0.85rem">Redirecting you back...</p>' +
+        '</div>';
+      setTimeout(function() { window.location.href = "video1.html"; }, 2000);
+      return;
+    }
+  })();
+  // Only set incomplete if not already completed/passed
+  var _cur = SCORM.get("cmi.core.lesson_status");
+  if (_cur !== "completed" && _cur !== "passed" && _cur !== "failed") {
+    SCORM.setStatus("incomplete");
+  }
+
+  var vid = document.getElementById("vid");
+  var btn = document.getElementById("nextBtn");
+  var hint = document.getElementById("hint");
+  var playBtn = document.getElementById("playBtn");
+  var progWatched = document.getElementById("progWatched");
+  var progThumb   = document.getElementById("progThumb");
+  var timeLabel   = document.getElementById("timeLabel");
+  var skipWarning = document.getElementById("skipWarning");
+  var unlocked = false;
+  var maxReached = 0;
+
+  vid.addEventListener("seeking", function() {
+    if (vid.currentTime > maxReached + 0.5) { vid.currentTime = maxReached; flashWarning(); }
+  });
+  vid.addEventListener("timeupdate", function() {
+    if (vid.currentTime > maxReached) maxReached = vid.currentTime;
+    if (vid.duration > 0) {
+      progWatched.style.width = (maxReached / vid.duration * 100) + "%";
+      progThumb.style.left    = (vid.currentTime / vid.duration * 100) + "%";
+      timeLabel.textContent   = fmt(vid.currentTime) + " / " + fmt(vid.duration);
+    }
+    if (!unlocked && vid.duration > 0 && vid.currentTime >= vid.duration * 0.9) unlock();
+  });
+  vid.addEventListener("ended", unlock);
+  vid.addEventListener("play",  function(){ playBtn.textContent = "⏸ Pause"; });
+  vid.addEventListener("pause", function(){ playBtn.textContent = "▶ Play";  });
+
+  function togglePlay() { vid.paused ? vid.play() : vid.pause(); }
+  function toggleMute() { vid.muted = !vid.muted; document.getElementById("volBtn").textContent = vid.muted ? "🔇" : "🔊"; }
+
+  document.getElementById("progTrack").addEventListener("click", function(e) {
+    if (!vid.duration) return;
+    var rect = this.getBoundingClientRect();
+    var t = (e.clientX - rect.left) / rect.width * vid.duration;
+    if (t <= maxReached + 0.5) vid.currentTime = t; else flashWarning();
+  });
+
+  function flashWarning() {
+    skipWarning.style.display = "block";
+    clearTimeout(skipWarning._t);
+    skipWarning._t = setTimeout(function(){ skipWarning.style.display = "none"; }, 2500);
+  }
+  function fmt(s) { s = Math.floor(s||0); return Math.floor(s/60)+":"+(("0"+(s%60)).slice(-2)); }
+
+  function unlock() {
+    if (unlocked) return;
+    unlocked = true;
+    btn.disabled = false;
+    hint.textContent = "✅ Video complete — you may now proceed to the assessment.";
+    // status committed by goNext() via SCORM.complete()
+  }
+  function goNext() {
+    localStorage.setItem("im_video2", "done");
+    SCORM.complete();
+    window.location.href = "quiz.html";
+  }
+</script>
+</body>
+</html>

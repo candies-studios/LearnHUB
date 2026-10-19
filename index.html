@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LearnHub</title>
+  <!-- GitHub Pages entry point: runs LearnHub entirely in the browser (demo mode).
+       The server version uses public/index.html via `node server.js`. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="public/styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230a6ed1'/><path d='M8 12l8-4 8 4-8 4z' fill='white'/><path d='M11 14v5c0 1.5 2.5 3 5 3s5-1.5 5-3v-5' stroke='white' stroke-width='2' fill='none'/></svg>" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#0f1b2b" />
+</head>
+<body>
+  <div id="app"><div class="boot">Loading…</div></div>
+  <div id="modal-root"></div>
+  <div id="toast-root"></div>
+  <script>window.LH_LOCAL = true;</script>
+  <script src="pages/learnhub-local.js"></script>
+  <script src="public/app.js"></script>
+  <script src="public/admin.js"></script>
+</body>
+</html>
