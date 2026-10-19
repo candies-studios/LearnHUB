@@ -1,0 +1,23 @@
+# Render Blueprint — deploys LearnHub as a web service with a persistent disk.
+# In Render: New → Blueprint → pick this GitHub repo. You will be asked for the two admin values.
+services:
+  - type: web
+    name: learnhub
+    runtime: node
+    plan: starter            # paid plan: required for a persistent disk (free plans lose data on restart)
+    region: singapore        # closest Render region to India; change if you like
+    buildCommand: echo "LearnHub has no build step"
+    startCommand: node server.js
+    healthCheckPath: /api/me
+    autoDeploy: true         # every push to GitHub redeploys
+    envVars:
+      - key: LH_DATA
+        value: /var/data     # database + uploaded content live on the disk below
+      - key: LH_ADMIN_EMAIL
+        sync: false          # you type it in Render on first deploy
+      - key: LH_ADMIN_PASSWORD
+        sync: false
+    disk:
+      name: learnhub-data
+      mountPath: /var/data
+      sizeGB: 5
