@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<manifest identifier="ChillerSOPandLockoutProcess" version="1.0"
+<manifest identifier="ChillerSOPandLockoutProcess" version="1.1"
   xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2"
   xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -14,26 +14,18 @@
   <organizations default="org1">
     <organization identifier="org1">
       <title>Chiller SOP and Lockout Process</title>
-      <item identifier="item_video1" identifierref="res_video1">
-        <title>Module 1: Video – Chiller SOP</title>
-      </item>
-      <item identifier="item_video2" identifierref="res_video2">
-        <title>Module 2: Video – Lockout Process</title>
+      <item identifier="item_video" identifierref="res_video">
+        <title>Module 1: Training Video – Introduction, Chiller SOP &amp; Lockout Process</title>
       </item>
       <item identifier="item_quiz" identifierref="res_quiz">
-        <title>Module 3: Assessment</title>
+        <title>Module 2: Assessment</title>
       </item>
     </organization>
   </organizations>
 
   <resources>
-    <resource identifier="res_video1" type="webcontent" adlcp:scormtype="sco" href="video1.html">
-      <file href="video1.html"/>
-      <dependency identifierref="res_shared"/>
-    </resource>
-
-    <resource identifier="res_video2" type="webcontent" adlcp:scormtype="sco" href="video2.html">
-      <file href="video2.html"/>
+    <resource identifier="res_video" type="webcontent" adlcp:scormtype="sco" href="video.html">
+      <file href="video.html"/>
       <dependency identifierref="res_shared"/>
     </resource>
 
@@ -45,8 +37,7 @@
     <resource identifier="res_shared" type="webcontent" adlcp:scormtype="asset">
       <file href="css/style.css"/>
       <file href="js/scorm_api.js"/>
-      <file href="video/chiller_sop.mp4"/>
-      <file href="video/m1_c1.mp4"/>
+      <file href="video/chiller_sop_lockout.mp4"/>
     </resource>
   </resources>
 </manifest>
